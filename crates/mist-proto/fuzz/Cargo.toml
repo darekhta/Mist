@@ -1,0 +1,42 @@
+[package]
+name = "mist-proto-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+mist-proto = { path = ".." }
+
+[[bin]]
+name = "decode_ctl"
+path = "fuzz_targets/decode_ctl.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_rpc"
+path = "fuzz_targets/decode_rpc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decode_event"
+path = "fuzz_targets/decode_event.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "frame_header"
+path = "fuzz_targets/frame_header.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

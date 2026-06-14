@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Mount-helper entitlements: none beyond Hardened Runtime. It is a plain root daemon shelling
+     mount_nfs/umount; the XPC listener is gated in code by a code-signing requirement (design 11 §8). -->
+<plist version="1.0">
+<dict>
+</dict>
+</plist>

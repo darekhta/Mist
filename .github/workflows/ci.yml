@@ -1,0 +1,46 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  lint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy", targets: aarch64-unknown-linux-gnu }
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets
+      - run: cargo clippy -p mistd --all-targets --target aarch64-unknown-linux-gnu
+
+  # cargo-deny-action is a Docker container action → Linux-only; it cannot run on the macOS
+  # lint runner. It is platform-independent (analyzes Cargo.lock), so it gets its own job.
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  test-macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace
+      - name: swift build (MistBridge + vmshim)
+        run: swift build --package-path swift/MistBridge
+
+  test-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --workspace
+      - name: mistd privileged tests (loop ext4, name_to_handle_at)
+        run: |
+          sudo -E "$(command -v cargo)" test -p mistd -- --ignored privileged_

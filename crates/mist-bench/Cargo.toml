@@ -1,0 +1,26 @@
+[package]
+name = "mist-bench"
+description = "Mist benchmark harness: transport RTT/throughput, seed rate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-proto = { workspace = true }
+mist-transport = { workspace = true }
+mist-replica = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+hdrhistogram = { workspace = true }
+blake3 = { workspace = true, features = ["pure"] } # cross-built to musl: no C toolchain
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+tokio-vsock = { workspace = true }
+libc = { workspace = true }

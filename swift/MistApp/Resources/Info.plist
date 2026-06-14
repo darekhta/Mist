@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mist.app Info.plist. LSUIElement=1 makes it a menu-bar-only agent (no Dock icon, design 11 §7).
+  Local-network declarations live with the process that browses (design 11 §7): the app embeds
+  mist-hostd/mist, which do the _mist._tcp / _ssh._tcp browse, so the bundle carries
+  NSLocalNetworkUsageDescription + NSBonjourServices. The restricted multicast entitlement is NOT
+  requested — a declared _mist._tcp browse through mDNSResponder does not need it.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Mist</string>
+    <key>CFBundleDisplayName</key>
+    <string>Mist</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.mist.app</string>
+    <key>CFBundleVersion</key>
+    <string>0.1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Mist discovers and connects to your Linux VM over the local virtual network (mDNS + the vmnet subnet).</string>
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_mist._tcp</string>
+        <string>_ssh._tcp</string>
+    </array>
+
+    <!-- Sparkle auto-update (design 11 §8): EdDSA-signed appcast over HTTPS, GitHub-hosted.
+         SUPublicEDKey is the EdDSA *public* key (not a secret); fill it from `generate_keys`. -->
+    <key>SUFeedURL</key>
+    <string>https://github.com/darekhta/Mist/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>wXgIcPqvzdPIZ1bFOXtGfAR0GM3rUjnmHL5Y9BfdPVo=</string>
+    <!-- Not sandboxed → use Sparkle's in-process installer; the Installer/Downloader XPCs are
+         stripped from the embedded framework by build-app.sh, so don't enable the launcher service. -->
+    <key>SUEnableInstallerLauncherService</key>
+    <false/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
+</dict>
+</plist>

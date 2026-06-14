@@ -1,0 +1,89 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/mist-proto",
+    "crates/mist-transport",
+    "crates/mist-replica",
+    "crates/mist-nfs",
+    "crates/mist-cas",
+    "crates/mistd",
+    "crates/mist-hostd",
+    "crates/mist-cli",
+    "crates/mist-bench",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/darekhta/mist"
+authors = ["Mist contributors"]
+
+[workspace.dependencies]
+hashbrown = "0.17"
+mist-proto = { path = "crates/mist-proto" }
+mist-transport = { path = "crates/mist-transport" }
+mist-replica = { path = "crates/mist-replica" }
+mist-nfs = { path = "crates/mist-nfs" }
+mist-cas = { path = "crates/mist-cas" }
+mist-hostd = { path = "crates/mist-hostd" }
+
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+bytes = "1"
+# No "pure": CAS ingest hashing needs SIMD (NEON on aarch64 is pure-Rust intrinsics in
+# blake3 >=1.5, so the rust-lld musl cross-build of mistd still needs no C toolchain).
+blake3 = "1"
+redb = "4"
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "net",
+    "io-util",
+    "sync",
+    "time",
+    "macros",
+    "fs",
+    "signal",
+    "process",
+] }
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8"
+# Format-preserving writer for config.toml: pairing edits one [vm.<name>] block without
+# clobbering other VMs' blocks, comments, or layout (design 11 §4 "never hand-edited TOML").
+toml_edit = "0.22"
+clap = { version = "4", features = ["derive"] }
+rand = "0.9"
+hdrhistogram = "7"
+
+# linux-only (mistd)
+rustix = { version = "1", features = ["fs", "net", "process", "param", "system"] }
+libc = "0.2"
+tokio-vsock = "0.7"
+
+# dev
+proptest = "1"
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "deny" # relaxed per-crate where FFI is required (mistd)
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+await_holding_lock = "deny"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+
+[profile.bench]
+debug = true

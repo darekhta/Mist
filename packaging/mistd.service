@@ -1,0 +1,22 @@
+[Unit]
+Description=Mist guest daemon (file-share journal + applier)
+Documentation=https://github.com/mist-fs/mist
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/sbin/mistd --config /etc/mist/mistd.toml
+Restart=always
+RestartSec=1
+# mistd needs: fanotify FAN_MARK_FILESYSTEM (CAP_SYS_ADMIN), open_by_handle_at
+# (CAP_DAC_READ_SEARCH), and the applier's setfsuid identity squash (CAP_SETUID/SETGID,
+# CAP_CHOWN/FOWNER for setattr, CAP_MKNOD for device nodes). Filesystem-protection sandboxing
+# (ProtectSystem=full, ProtectHome=*) MUST stay off: the applier writes the shared trees, which
+# commonly live under /home — ProtectHome=read-only makes those writes fail EROFS. The targeted
+# capability set above is the hardening boundary instead.
+AmbientCapabilities=CAP_SYS_ADMIN CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_CHOWN CAP_FOWNER CAP_SETUID CAP_SETGID CAP_MKNOD
+NoNewPrivileges=no
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

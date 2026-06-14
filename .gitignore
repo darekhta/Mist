@@ -1,0 +1,24 @@
+target/
+/swift/MistBridge/.build
+/swift/MistBridge/.swiftpm
+/swift/MistApp/.build
+/swift/MistApp/.swiftpm
+*.raw
+*.qcow2
+*.img
+/e2e-work/
+.DS_Store
+bench/baselines/local-*
+/dist/
+
+# Signing material — NEVER commit. All of this lives in CI secrets or the local keychain.
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+cert.p12
+notary_key.p8
+minisign.key
+*.dmg
+# Sparkle appcast is a per-release build output (regenerated + published each release).
+/packaging/appcast.xml

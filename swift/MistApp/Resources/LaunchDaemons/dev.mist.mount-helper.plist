@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The mount-helper's launchd daemon, registered via SMAppService.daemon(plistName:) (design 11 §8).
+  Lives in Contents/Library/LaunchDaemons; the executable in Contents/Library/HelperTools. Runs as
+  root and exposes exactly one Mach service (mount/unmount XPC, code-sign gated). First registration
+  costs one admin auth; re-registering an approved service after a Sparkle update skips the prompt.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.mist.mount-helper</string>
+    <key>BundleProgram</key>
+    <string>Contents/Library/HelperTools/mist-mount-helper</string>
+    <key>MachServices</key>
+    <dict>
+        <key>dev.mist.mount-helper</key>
+        <true/>
+    </dict>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>dev.mist.app</string>
+    </array>
+</dict>
+</plist>

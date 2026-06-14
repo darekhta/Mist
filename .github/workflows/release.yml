@@ -1,0 +1,175 @@
+name: release
+
+# Builds installable artifacts:
+#   - guest mistd .deb per (distro × arch), each smoke-tested by installing it in that
+#     distro's container (arm64 via QEMU)
+#   - macOS tarball (mist + mist-hostd) for the host side
+# Trigger on a version tag (v1.2.3) to also cut a GitHub Release; workflow_dispatch builds
+# artifacts without releasing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (default: workspace Cargo.toml version)"
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ---- guest daemon: static-musl binaries, one per architecture ------------------------
+  mistd-binaries:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            target: aarch64-unknown-linux-musl
+          - arch: amd64
+            target: x86_64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Build static mistd
+        run: |
+          RUSTFLAGS="-C linker=rust-lld -C link-self-contained=yes" \
+            cargo build --release --target ${{ matrix.target }} -p mistd
+          file target/${{ matrix.target }}/release/mistd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mistd-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/mistd
+          if-no-files-found: error
+
+  # ---- .deb per (distro × arch), each install-tested in its own distro container --------
+  debs:
+    needs: mistd-binaries
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, amd64]
+        # Debian bullseye + trixie and the two most recent Ubuntu releases. Bump the Ubuntu
+        # entries as new releases ship (the image tag is the version number).
+        distro:
+          - { codename: bullseye,   image: "debian:bullseye-slim" }
+          - { codename: trixie,     image: "debian:trixie-slim" }
+          - { codename: ubuntu2510, image: "ubuntu:25.10" }
+          - { codename: ubuntu2604, image: "ubuntu:26.04" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then V="${GITHUB_REF_NAME#v}";
+          elif [ -n "${{ inputs.version }}" ]; then V="${{ inputs.version }}";
+          else V="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: mistd-${{ matrix.arch }}
+          path: prebuilt
+      - name: Build .deb
+        run: |
+          chmod +x prebuilt/mistd
+          VERSION="${{ steps.ver.outputs.version }}" \
+          DEB_ARCH="${{ matrix.arch }}" \
+          CODENAME="${{ matrix.distro.codename }}" \
+          MISTD_BIN="$PWD/prebuilt/mistd" \
+            packaging/package-deb.sh
+      - name: Set up QEMU (for arm64 containers)
+        if: matrix.arch == 'arm64'
+        uses: docker/setup-qemu-action@v3
+      - name: Smoke-test install in ${{ matrix.distro.image }}
+        run: |
+          NAME=$(basename "$(ls dist/mistd_*_${{ matrix.arch }}.deb | head -1)")
+          echo "testing $NAME on ${{ matrix.distro.image }} (${{ matrix.arch }})"
+          docker run --rm --platform "linux/${{ matrix.arch }}" \
+            -e NAME="$NAME" -v "$PWD/dist:/dist" "${{ matrix.distro.image }}" sh -ec '
+              dpkg -i "/dist/$NAME"
+              command -v mistd
+              mistd --help >/dev/null
+              mistd --check-config              # the shipped /etc/mist/mistd.toml must parse
+              test -f /lib/systemd/system/mistd.service
+              test -f /etc/mist/mistd.toml
+              test -s /etc/mist/token            # postinst minted a token
+              echo "install OK"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.distro.codename }}-${{ matrix.arch }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+  # ---- host side: macOS binaries (Apple silicon) --------------------------------------
+  macos:
+    runs-on: macos-15
+    env:
+      MIST_SIGN_ID: ${{ secrets.MIST_SIGN_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then V="${GITHUB_REF_NAME#v}";
+          elif [ -n "${{ inputs.version }}" ]; then V="${{ inputs.version }}";
+          else V="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - name: Build mist + mist-hostd
+        run: cargo build --release -p mist-cli -p mist-hostd
+      - name: Codesign (optional — runs only if the MIST_SIGN_ID secret is set)
+        if: ${{ env.MIST_SIGN_ID != '' }}
+        run: |
+          codesign --force --options runtime --sign "$MIST_SIGN_ID" \
+            target/release/mist target/release/mist-hostd
+      - name: Tarball
+        run: |
+          mkdir -p dist
+          tar -czf "dist/mist-${{ steps.ver.outputs.version }}-macos-arm64.tar.gz" \
+            -C target/release mist mist-hostd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # ---- assemble a GitHub Release on tag -----------------------------------------------
+  release:
+    if: github.ref_type == 'tag'
+    needs: [debs, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect + checksum + sign
+        env:
+          MINISIGN_SECRET_KEY_B64: ${{ secrets.MINISIGN_SECRET_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.deb' -o -name '*.tar.gz' \) -exec cp {} release/ \;
+          # install.sh fetches these from the release; ship the auditable installer alongside them.
+          cp packaging/install.sh release/
+          ( cd release && sha256sum *.deb *.tar.gz > SHA256SUMS )
+          # Sign SHA256SUMS so install.sh's minisign check passes (design 11 §5).
+          if [ -n "$MINISIGN_SECRET_KEY_B64" ]; then
+            sudo apt-get update -qq && sudo apt-get install -y minisign
+            echo "$MINISIGN_SECRET_KEY_B64" | base64 -d > minisign.key
+            printf '%s\n' "$MINISIGN_PASSWORD" | minisign -S -s minisign.key -m release/SHA256SUMS -x release/SHA256SUMS.minisig
+            rm -f minisign.key
+          else
+            echo "::warning::MINISIGN_SECRET_KEY unset — SHA256SUMS published UNSIGNED"
+          fi
+          ls -la release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true

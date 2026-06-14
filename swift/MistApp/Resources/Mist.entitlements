@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mist.app entitlements. NOT sandboxed and NOT Mac App Store (design 11 §7): the app registers a
+  privileged helper scaffold and lets the Rust resolver use lease/ARP fallbacks that don't fit the
+  MAS sandbox. It needs no exotic runtime entitlements (no
+  JIT/hypervisor), so this file stays minimal and notarization stays tractable (§8).
+-->
+<plist version="1.0">
+<dict>
+    <!-- Hardened Runtime is on (`codesign -o runtime`); no exceptions required. -->
+    <key>com.apple.security.app-sandbox</key>
+    <false/>
+</dict>
+</plist>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  mist-hostd as a per-user LaunchAgent, registered via SMAppService.agent(plistName:) (design 11
+  §8, ADR-1 topology). Frictionless: one Login-Items toggle, no admin password. Runs the NFS server
+  + replica + CAS as the user — this replaces the hand-installed ~/Library/LaunchAgents plist +
+  launchctl load. The agent (not the app) browses Bonjour via the system mDNS resolver; as a
+  per-user launchd agent it discovers _mist._tcp without the app-bundle local-network prompt.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>dev.mist.hostd</string>
+    <key>BundleProgram</key>
+    <string>Contents/Resources/mist-hostd</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>dev.mist.app</string>
+    </array>
+</dict>
+</plist>

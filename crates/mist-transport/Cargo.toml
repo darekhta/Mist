@@ -1,0 +1,20 @@
+[package]
+name = "mist-transport"
+description = "Mist transport: lane connectors (uds/tcp/vsock-bridge) and framed streams"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-proto = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

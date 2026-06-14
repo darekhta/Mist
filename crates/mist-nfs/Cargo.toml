@@ -1,0 +1,25 @@
+[package]
+name = "mist-nfs"
+description = "Mist NFS frontend: ONC-RPC + XDR + MOUNT3/NFSv3 read-write and NFSv4.1 delegations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-proto = { workspace = true }
+tokio = { workspace = true }
+parking_lot = { workspace = true }
+libc = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+
+[features]
+fuzzing = []

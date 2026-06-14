@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- LaunchAgent: install to ~/Library/LaunchAgents/ and `launchctl load` it.
+     KeepAlive gives the ≤1 s crash-restart the recovery matrix (design 06 §7) assumes;
+     hostd adopts surviving kernel mounts on restart (same-port rebind). -->
+<dict>
+    <key>Label</key><string>com.mist.hostd</string>
+    <key>ProgramArguments</key>
+    <array><string>/usr/local/bin/mist-hostd</string></array>
+    <key>RunAtLoad</key><true/>
+    <key>KeepAlive</key><true/>
+    <key>ProcessType</key><string>Interactive</string>
+    <key>StandardOutPath</key><string>/tmp/mist-hostd.log</string>
+    <key>StandardErrorPath</key><string>/tmp/mist-hostd.log</string>
+</dict>
+</plist>

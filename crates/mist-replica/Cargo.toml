@@ -1,0 +1,17 @@
+[package]
+name = "mist-replica"
+description = "Mist host-side metadata replica: tree structures and snapshot assembly"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mist-proto = { workspace = true }
+parking_lot = { workspace = true }
+hashbrown = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

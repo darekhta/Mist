@@ -1,0 +1,93 @@
+name: mac-app
+
+# Builds, signs, notarizes, and staples Mist.app + a DMG and generates the Sparkle appcast
+# (design 11 §8). Runs on a version tag (to attach the DMG + appcast to the GitHub Release) or on
+# demand. All credentials are REPO SECRETS — none are committed. Required secrets:
+#   MACOS_CERT_P12 / MACOS_CERT_PASSWORD       — Developer ID Application cert (base64 .p12 + password)
+#   MACOS_SIGN_ID                              — "Developer ID Application: <Name> (9YA6F7T5Z4)"
+#   NOTARY_KEY / NOTARY_KEY_ID / NOTARY_ISSUER — App Store Connect API key (.p8 base64) for notarytool
+#   SPARKLE_PRIVATE_KEY                         — Sparkle EdDSA private key (from `generate_keys -x`)
+# The Team ID (9YA6F7T5Z4) and the Sparkle PUBLIC key (Info.plist) are not secrets.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  app:
+    runs-on: macos-15
+    permissions:
+      contents: write  # action-gh-release updates the Release; default token is read-only otherwise
+    # secrets can't be used in step-level `if:`; surface their presence as job env booleans.
+    env:
+      HAS_CERT: ${{ secrets.MACOS_CERT_P12 != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Import signing certificate
+        if: env.HAS_CERT == 'true'
+        env:
+          P12: ${{ secrets.MACOS_CERT_P12 }}
+          P12_PW: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN=build.keychain
+          security create-keychain -p actions "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+          security unlock-keychain -p actions "$KEYCHAIN"
+          # codesign scans the search list for a Developer ID identity — setting the default keychain
+          # does NOT add it to that list; and a long notarize wait must not re-lock it.
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          echo "$P12" | base64 --decode > cert.p12
+          security import cert.p12 -k "$KEYCHAIN" -P "$P12_PW" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k actions "$KEYCHAIN"
+          rm -f cert.p12
+
+      - name: Store notarytool credentials
+        if: env.HAS_NOTARY == 'true'
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.NOTARY_ISSUER }}
+        run: |
+          echo "$NOTARY_KEY" | base64 --decode > notary_key.p8
+          xcrun notarytool store-credentials mist-notary \
+            --key notary_key.p8 --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER"
+          rm -f notary_key.p8
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build, sign, notarize app + DMG, generate appcast
+        env:
+          MIST_SIGN_ID: ${{ secrets.MACOS_SIGN_ID }}
+          NOTARY_PROFILE: ${{ secrets.NOTARY_KEY != '' && 'mist-notary' || '' }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: bash packaging/build-app.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mist-app
+          path: |
+            dist/Mist-*.dmg
+            packaging/appcast.xml
+
+      # Only a fully signed + notarized build may touch a public Release. Without the cert/notary
+      # secrets the job still builds an UNSIGNED DMG (uploaded as a workflow artifact above for
+      # testing), but never attaches it — and the appcast is only attached if build-app.sh actually
+      # regenerated it this run (placeholder appcast.xml is not committed, so a missing file = skip).
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/') && env.HAS_CERT == 'true' && env.HAS_NOTARY == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Mist-*.dmg
+            packaging/appcast.xml
